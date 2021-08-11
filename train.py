@@ -42,7 +42,7 @@ def main(args):
 
     # Model
     print('Building model..')
-    net = TTNVP((args.batch_size, 3, 32, 32), num_scales=2,
+    net = ContrastiveNVP((args.batch_size, 3, 32, 32), num_scales=2,
                 in_channels=3, mid_channels=64, num_blocks=8)
     net = net.to(device)
     if device == 'cuda':
