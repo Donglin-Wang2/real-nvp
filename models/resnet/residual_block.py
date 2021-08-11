@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from util import WNConv2d
+from real_nvp.util import WNConv2d
 
 
 class ResidualBlock(nn.Module):

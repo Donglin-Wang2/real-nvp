@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.real_nvp.coupling_layer import CouplingLayer, MaskType
-from util import squeeze_2x2
+from real_nvp.models.real_nvp.coupling_layer import CouplingLayer, MaskType
+from real_nvp.util import squeeze_2x2
 
 
 class RealNVP(nn.Module):

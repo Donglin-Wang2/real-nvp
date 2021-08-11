@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.resnet.residual_block import ResidualBlock
-from util import WNConv2d
+from real_nvp.models.resnet.residual_block import ResidualBlock
+from real_nvp.util import WNConv2d
 
 
 class ResNet(nn.Module):

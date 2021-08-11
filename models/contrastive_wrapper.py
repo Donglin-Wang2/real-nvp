@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.nn.modules.activation import Sigmoid
-from models.real_nvp import RealNVP
+from real_nvp.models.real_nvp import RealNVP
 
 
 class Reducer(nn.Module):
