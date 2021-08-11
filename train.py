@@ -12,7 +12,7 @@ import torchvision
 import torchvision.transforms as transforms
 import util
 
-from models import RealNVP, RealNVPLoss
+from models import RealNVP, RealNVPLoss, ContrastiveNVP
 from tqdm import tqdm
 
 
@@ -30,15 +30,20 @@ def main(args):
         transforms.ToTensor()
     ])
 
-    trainset = torchvision.datasets.CIFAR10(root='data', train=True, download=True, transform=transform_train)
-    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    trainset = torchvision.datasets.CIFAR10(
+        root='data', train=True, download=True, transform=transform_train)
+    trainloader = data.DataLoader(
+        trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
-    testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
-    testloader = data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    testset = torchvision.datasets.CIFAR10(
+        root='data', train=False, download=True, transform=transform_test)
+    testloader = data.DataLoader(
+        testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     # Model
     print('Building model..')
-    net = RealNVP(num_scales=2, in_channels=3, mid_channels=64, num_blocks=8)
+    net = TTNVP((args.batch_size, 3, 32, 32), num_scales=2,
+                in_channels=3, mid_channels=64, num_blocks=8)
     net = net.to(device)
     if device == 'cuda':
         net = torch.nn.DataParallel(net, args.gpu_ids)
@@ -55,11 +60,13 @@ def main(args):
         start_epoch = checkpoint['epoch']
 
     loss_fn = RealNVPLoss()
-    param_groups = util.get_param_groups(net, args.weight_decay, norm_suffix='weight_g')
+    param_groups = util.get_param_groups(
+        net, args.weight_decay, norm_suffix='weight_g')
     optimizer = optim.Adam(param_groups, lr=args.lr)
 
     for epoch in range(start_epoch, start_epoch + args.num_epochs):
-        train(epoch, net, trainloader, device, optimizer, loss_fn, args.max_grad_norm)
+        train(epoch, net, trainloader, device,
+              optimizer, loss_fn, args.max_grad_norm)
         test(epoch, net, testloader, device, loss_fn, args.num_samples)
 
 
@@ -72,7 +79,10 @@ def train(epoch, net, trainloader, device, optimizer, loss_fn, max_grad_norm):
             x = x.to(device)
             optimizer.zero_grad()
             z, sldj = net(x, reverse=False)
-            loss = loss_fn(z, sldj)
+            nvp_loss = loss_fn(z, sldj)
+            xhat, _ = net(z, reverse=True)
+            recon_loss = torch.mean(x.clone().detach() - xhat).contiguous()
+            loss =  nvp_loss + recon_loss
             loss_meter.update(loss.item(), x.size(0))
             loss.backward()
             util.clip_grad_norm(optimizer, max_grad_norm)
@@ -91,7 +101,8 @@ def sample(net, batch_size, device):
         batch_size (int): Number of samples to generate.
         device (torch.device): Device to use.
     """
-    z = torch.randn((batch_size, 3, 32, 32), dtype=torch.float32, device=device)
+    z = torch.randn((batch_size, 3, 32, 32),
+                    dtype=torch.float32, device=device)
     x, _ = net(z, reverse=True)
     x = torch.sigmoid(x)
 
@@ -128,22 +139,32 @@ def test(epoch, net, testloader, device, loss_fn, num_samples):
     # Save samples and data
     images = sample(net, num_samples, device)
     os.makedirs('samples', exist_ok=True)
-    images_concat = torchvision.utils.make_grid(images, nrow=int(num_samples ** 0.5), padding=2, pad_value=255)
-    torchvision.utils.save_image(images_concat, 'samples/epoch_{}.png'.format(epoch))
+    images_concat = torchvision.utils.make_grid(
+        images, nrow=int(num_samples ** 0.5), padding=2, pad_value=255)
+    torchvision.utils.save_image(
+        images_concat, 'samples/epoch_{}.png'.format(epoch))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RealNVP on CIFAR-10')
 
-    parser.add_argument('--batch_size', default=64, type=int, help='Batch size')
-    parser.add_argument('--benchmark', action='store_true', help='Turn on CUDNN benchmarking')
-    parser.add_argument('--gpu_ids', default='[0]', type=eval, help='IDs of GPUs to use')
+    parser.add_argument('--batch_size', default=64,
+                        type=int, help='Batch size')
+    parser.add_argument('--benchmark', action='store_true',
+                        help='Turn on CUDNN benchmarking')
+    parser.add_argument(
+        '--gpu_ids', default='[0]', type=eval, help='IDs of GPUs to use')
     parser.add_argument('--lr', default=1e-3, type=float, help='Learning rate')
-    parser.add_argument('--max_grad_norm', type=float, default=100., help='Max gradient norm for clipping')
-    parser.add_argument('--num_epochs', default=100, type=int, help='Number of epochs to train')
-    parser.add_argument('--num_samples', default=64, type=int, help='Number of samples at test time')
-    parser.add_argument('--num_workers', default=8, type=int, help='Number of data loader threads')
-    parser.add_argument('--resume', '-r', action='store_true', help='Resume from checkpoint')
+    parser.add_argument('--max_grad_norm', type=float,
+                        default=100., help='Max gradient norm for clipping')
+    parser.add_argument('--num_epochs', default=100,
+                        type=int, help='Number of epochs to train')
+    parser.add_argument('--num_samples', default=64, type=int,
+                        help='Number of samples at test time')
+    parser.add_argument('--num_workers', default=8, type=int,
+                        help='Number of data loader threads')
+    parser.add_argument('--resume', '-r', action='store_true',
+                        help='Resume from checkpoint')
     parser.add_argument('--weight_decay', default=5e-5, type=float,
                         help='L2 regularization (only applied to the weight norm scale factors)')
 
