@@ -7,10 +7,10 @@ from real_nvp.models.real_nvp import RealNVP
 
 
 class Reducer(nn.Module):
-    def __init__(self, batch_shape) -> None:
+    def __init__(self, img_shape) -> None:
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(np.prod(batch_shape[1:]), 1024),
+            nn.Linear(np.prod(img_shape), 1024),
             nn.LeakyReLU(),
             nn.Linear(1024, 512),
             nn.LeakyReLU(),
@@ -34,7 +34,7 @@ class Reducer(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(512, 1024),
             nn.LeakyReLU(),
-            nn.Linear(1024, np.prod(batch_shape[1:])),
+            nn.Linear(1024, np.prod(img_shape)),
             nn.Sigmoid()
         )
 
@@ -46,12 +46,12 @@ class Reducer(nn.Module):
 
 
 class ContrastiveNVP(nn.Module):
-    def __init__(self, batch_shape, num_scales=2, in_channels=3, mid_channels=64, num_blocks=8):
+    def __init__(self, img_shape, num_scales=2, in_channels=3, mid_channels=64, num_blocks=8):
         super().__init__()
-        self.batch_shape = batch_shape
+        self.img_shape = img_shape
         self.nvp = RealNVP(num_scales=num_scales, in_channels=in_channels,
                            mid_channels=mid_channels, num_blocks=num_blocks)
-        self.tt = Reducer(batch_shape)
+        self.tt = Reducer(img_shape)
 
     def forward(self, x, reverse=False):
         
@@ -61,5 +61,5 @@ class ContrastiveNVP(nn.Module):
             return self.tt(z), sldj
         else:
             z = self.tt(x, reverse=True)
-            z = z.reshape(self.batch_shape).contiguous()
+            z = z.reshape(self.img_shape).contiguous()
             return self.nvp(z,reverse=True)
