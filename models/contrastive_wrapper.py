@@ -54,12 +54,11 @@ class ContrastiveNVP(nn.Module):
         self.tt = Reducer(img_shape)
 
     def forward(self, x, reverse=False):
-        
         if not reverse:
             z, sldj = self.nvp(x)
             z = torch.flatten(z, start_dim=1).contiguous()
             return self.tt(z), sldj
         else:
             z = self.tt(x, reverse=True)
-            z = z.reshape(self.img_shape).contiguous()
+            z = z.reshape([-1,] + self.img_shape).contiguous()
             return self.nvp(z,reverse=True)
